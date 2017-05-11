@@ -1,0 +1,82 @@
+#include<stdio.h>
+#include<Windows.h>
+#include<conio.h>
+#include<time.h>
+#define MAX_WIDE 50
+#define MAX_HIGH 16
+short dx = 1, dy = 0, randxy, score = 0;
+COORD coord;
+struct snake {                                                                       //创建蛇链表，每个蛇节点的位置由一个short（16位）变量表示
+	short position;                                                                  //高8位表示Y坐标，低8位表示X坐标
+	snake *next;
+}*head, *body, *tail, *del;
+void run();
+void draw();
+
+int main()
+{
+	head = new snake;
+	head->position = (MAX_HIGH / 2) << 8 | MAX_WIDE / 2;                               //设置蛇的初始位置在画面的中间
+	head->next = NULL;
+	srand((unsigned)time(NULL));
+	randxy = ((rand() % 16 + 0) << 8) | (rand() % 50 + 0);                             //设置食物的初始位置为随机位置
+	SMALL_RECT rect;                                                                   //画面的初始化
+	rect.Top = 0, rect.Left = 0;
+	rect.Bottom = MAX_HIGH, rect.Right = MAX_WIDE;
+	SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), true, &rect);
+	run();                                                                             //开始游戏
+	body = head;                                                                       //结束游戏，销毁蛇链表，释放内存
+	while (body != tail) {
+		del = body, body = body->next;
+		delete del;
+	}
+	printf("Your Score : %d", score);                                                  //显示分数
+	system("pause");
+	return 0;
+}
+
+void run()
+{
+	char key = 'd';
+	tail = head;
+	short temp1 = 0, temp2 = 0;
+	while (head->position > 0 && ((head->position & 127) < MAX_WIDE) && (head->position >> 8 < MAX_HIGH)) {          //若碰到边缘则退出循环，游戏结束
+		draw();
+		if (_kbhit())key = _getch();                                                 //用于获取键盘输入
+		switch (key) {                                                              //根据输入的方向改变位置增量
+		case 'w':dx = 0, dy = -1;break;
+		case 's':dx = 0, dy = 1;break;
+		case 'a':dx = -1, dy = 0;break;
+		case 'd':dx = 1, dy = 0;break;
+		}
+		for (body = head->next;body != tail->next;body = body->next)                //遍历整个蛇链表，若蛇头碰到蛇身，则游戏结束
+			if (body->position == head->position)return;
+		if (randxy == head->position) {                                             //若蛇头吃到食物，则蛇链表增加一个节点，分数增加并重新计算食物位置
+			body = new snake;
+			tail->next = body, tail = body;
+			tail->next = NULL, score += 10;
+			randxy = ((rand() % 16 + 0) << 8) | (rand() % 50 + 0);
+		}
+		for (temp1 = head->position, body = head->next;body != tail->next;body = body->next, temp1 = temp2) {
+			temp2 = body->position;                                                 //遍历整个蛇链表，利用两个缓存变量将前一个节点的数值赋给下一个节点，
+			body->position = temp1;                                                 //使蛇身前进
+		}
+		head->position = ((head->position & 127) + dx) | ((head->position >> 8) + dy) << 8;    //对蛇头的x,y坐标加上增量
+		Sleep(100);                                                                 //设置画面刷新率
+		system("cls");                                                              //清空画面以便下次循环重新绘制
+	}
+}
+
+void draw()
+{
+	for (body = head;body != tail->next;body = body->next) {                        //遍历整个蛇链表，根据每个节点的数值（坐标）绘制每个蛇节点
+		coord.X = body->position & 127;
+		coord.Y = body->position >> 8;
+		SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+		putchar('*');
+	}
+	coord.X = randxy & 127;                                                         //绘制食物
+	coord.Y = randxy >> 8;
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+	putchar('*');
+}
