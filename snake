@@ -4,20 +4,21 @@
 #include<time.h>
 #define MAX_WIDE 50
 #define MAX_HIGH 16
-short dx = 1, dy = 0, randxy, score = 0;
+short randxy, score = 0;
 COORD coord;
 struct snake {                                                                       //创建蛇链表，每个蛇节点的位置由一个short（16位）变量表示
 	short position;                                                                  //高8位表示Y坐标，低8位表示X坐标
 	snake *next;
-}*head, *body, *tail, *del;
-void run();
-void draw();
+}*head, *body, *tail;                                                                //head表示蛇的头部，实际指向链表最后一个节点
+void run();                                                                          //tail表示蛇的尾部，实际指向链表第一个节点
+void draw();                                                                         //body指针用于新建节点或遍历链表
 
 int main()
 {
 	head = new snake;
 	head->position = (MAX_HIGH / 2) << 8 | MAX_WIDE / 2;                               //设置蛇的初始位置在画面的中间
 	head->next = NULL;
+	tail = head;
 	srand((unsigned)time(NULL));
 	randxy = ((rand() % 16 + 0) << 8) | (rand() % 50 + 0);                             //设置食物的初始位置为随机位置
 	SMALL_RECT rect;                                                                   //画面的初始化
@@ -25,10 +26,11 @@ int main()
 	rect.Bottom = MAX_HIGH, rect.Right = MAX_WIDE;
 	SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), true, &rect);
 	run();                                                                             //开始游戏
-	body = head;                                                                       //结束游戏，销毁蛇链表，释放内存
-	while (body != tail) {
-		del = body, body = body->next;
+	snake *del = tail;                                                                 //结束游戏，销毁蛇链表，释放内存
+	while (tail != NULL) {
+		tail = tail->next;
 		delete del;
+		del = tail;
 	}
 	printf("Your Score : %d", score);                                                  //显示分数
 	system("pause");
@@ -37,9 +39,8 @@ int main()
 
 void run()
 {
-	char key = 'd';
-	tail = head;
-	short temp1 = 0, temp2 = 0;
+	char key = 'd';                                                                   //设置初始方向为向右走
+	short dx, dy;
 	while (head->position > 0 && ((head->position & 127) < MAX_WIDE) && (head->position >> 8 < MAX_HIGH)) {          //若碰到边缘则退出循环，游戏结束
 		draw();
 		if (_kbhit())key = _getch();                                                 //用于获取键盘输入
@@ -49,19 +50,23 @@ void run()
 		case 'a':dx = -1, dy = 0;break;
 		case 'd':dx = 1, dy = 0;break;
 		}
-		for (body = head->next;body != tail->next;body = body->next)                //遍历整个蛇链表，若蛇头碰到蛇身，则游戏结束
+		for (body = tail;body != head;body = body->next)                      //遍历整个蛇链表，若蛇头碰到蛇身，则游戏结束
 			if (body->position == head->position)return;
-		if (randxy == head->position) {                                             //若蛇头吃到食物，则蛇链表增加一个节点，分数增加并重新计算食物位置
+		if (randxy == head->position) {                                       //若蛇头吃到食物，则新建一个节点作为新的头部
 			body = new snake;
-			tail->next = body, tail = body;
-			tail->next = NULL, score += 10;
+			body->position = ((head->position & 127) + dx) | (((head->position >> 8) + dy) << 8);
+			body->next = NULL;
+			head->next = body, head = body;
+			score += 10;                                                      //分数增加并重新计算食物位置
 			randxy = ((rand() % 16 + 0) << 8) | (rand() % 50 + 0);
 		}
-		for (temp1 = head->position, body = head->next;body != tail->next;body = body->next, temp1 = temp2) {
-			temp2 = body->position;                                                 //遍历整个蛇链表，利用两个缓存变量将前一个节点的数值赋给下一个节点，
-			body->position = temp1;                                                 //使蛇身前进
+		else if (tail->next != NULL) {                                        //若没有吃到食物，且不止一个节点，则将尾巴节点作为新的头部
+			body = tail, tail = tail->next;                                   //每次移动只将新头部在原头部的基础上增加位移增量，其它节点不改动
+			body->position = ((head->position & 127) + dx) | (((head->position >> 8) + dy) << 8);
+			body->next = NULL;
+			head->next = body, head = body;
 		}
-		head->position = ((head->position & 127) + dx) | ((head->position >> 8) + dy) << 8;    //对蛇头的x,y坐标加上增量
+		else head->position = ((head->position & 127) + dx) | ((head->position >> 8) + dy) << 8;    //只有一个节点，直接增加位移增量
 		Sleep(100);                                                                 //设置画面刷新率
 		system("cls");                                                              //清空画面以便下次循环重新绘制
 	}
@@ -69,7 +74,7 @@ void run()
 
 void draw()
 {
-	for (body = head;body != tail->next;body = body->next) {                        //遍历整个蛇链表，根据每个节点的数值（坐标）绘制每个蛇节点
+	for (body = tail;body != NULL;body = body->next) {                        //遍历整个蛇链表，根据每个节点的数值（坐标）绘制每个蛇节点
 		coord.X = body->position & 127;
 		coord.Y = body->position >> 8;
 		SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
